@@ -1,0 +1,16 @@
+{
+  "name": "price-scraper-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema Web de Búsqueda Inteligente y Comparación de Precios mediante Scraping",
+  "scripts": {
+    "dev:scraper": "python scraper_engine/main.py",
+    "dev:server": "npm --prefix server run start",
+    "dev:client": "npm --prefix client run dev",
+    "dev": "concurrently -k -n \"SCRAPER,SERVER,CLIENT\" -c \"yellow.bold,blue.bold,green.bold\" \"npm run dev:scraper\" \"npm run dev:server\" \"npm run dev:client\"",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4"
+  }
+}
