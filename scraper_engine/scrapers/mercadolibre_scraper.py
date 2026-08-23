@@ -1,6 +1,7 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import quote
 
 try:
     from .base_scraper import BaseScraper
@@ -9,26 +10,36 @@ except ImportError:
 
 
 class MercadoLibreScraper(BaseScraper):
+    def __init__(self):
+        super().__init__()
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "es-419,es;q=0.9,en;q=0.8",
+        }
+
     def search(self, query: str):
-        formatted_query = query.strip().replace(" ", "-")
+        formatted_query = query.strip().lower().replace(" ", "-")
         url = f"https://listado.mercadolibre.com.pe/{formatted_query}"
         
         try:
-            response = requests.get(url, headers=self.headers, timeout=12)
+            response = requests.get(url, headers=self.headers, timeout=10)
             if response.status_code != 200:
-                return []
+                alt_url = f"https://listado.mercadolibre.com.pe/{quote(query.strip())}"
+                response = requests.get(alt_url, headers=self.headers, timeout=10)
+                if response.status_code != 200:
+                    return []
 
             soup = BeautifulSoup(response.text, "html.parser")
             items = []
 
-            # Soporta tanto el diseño moderno (poly-card) como el clásico (ui-search-layout__item)
             card_elements = (
                 soup.select("li.ui-search-layout__item")
                 or soup.select(".poly-card")
                 or soup.select(".ui-search-result__wrapper")
             )
 
-            for container in card_elements[:20]:
+            for container in card_elements[:25]:
                 title_elem = container.select_one(
                     ".ui-search-item__title, .poly-component__title, h2, h3, a.poly-component__title"
                 )
@@ -48,7 +59,6 @@ class MercadoLibreScraper(BaseScraper):
                 title = title_elem.text.strip()
                 link = link_elem.get("href", "#")
                 
-                # Extracción de imagen con data-src, src o data-lazy
                 img_src = ""
                 if img_elem:
                     img_src = (
@@ -58,27 +68,16 @@ class MercadoLibreScraper(BaseScraper):
                         or ""
                     )
 
-                # Parseo robusto del precio
-                price_val = 0.0
-                if price_elem:
-                    raw_price = price_elem.text.strip()
-                    # Elimina puntos de miles y comas
-                    clean_price = re.sub(r"[^\d.]", "", raw_price.replace(".", ""))
-                    try:
-                        price_val = float(clean_price)
-                    except ValueError:
-                        price_val = 0.0
+                price_val = self.parse_smart_price(price_elem.text if price_elem else "0")
 
-                # Detección de condición
                 condition_elem = container.select_one(
                     ".ui-search-item__group__element--attributes, .poly-attributes_list"
                 )
                 condition_text = condition_elem.text.lower() if condition_elem else ""
                 condition = "Seminuevo / Usado" if "usado" in condition_text or "reacondicionado" in condition_text else "Nuevo"
 
-                # Extracción de ID único
                 id_match = re.search(r"MPE[-_]?\d+", link)
-                item_id = f"ml_{id_match.group(0)}" if id_match else f"ml_{len(items)}_{hash(title) % 100000}"
+                item_id = f"ml_{id_match.group(0)}" if id_match else f"ml_{len(items)}_{abs(hash(title)) % 100000}"
 
                 items.append({
                     "id": item_id,

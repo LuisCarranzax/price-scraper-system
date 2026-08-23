@@ -1,6 +1,5 @@
 import { fetchScrapedProducts } from '../services/scraperService.js';
 
-// Diccionario enriquecido para autocompletado y sugerencias de hardware y electrónica
 const HARDWARE_TERMS = [
   'Kingston',
   'Kingston Fury Beast 16GB DDR4 3200MHz',
@@ -10,6 +9,10 @@ const HARDWARE_TERMS = [
   'Kingston A400 480GB SSD SATA',
   'Kingston XS1000 1TB SSD Externo',
   'Kingston Canvas Select Plus MicroSD 128GB',
+  'Laptop Gamer Victus HP Ryzen 7 RTX 4050',
+  'Laptop Gamer ASUS TUF Gaming F15 i7 RTX 4060',
+  'Laptop Lenovo IdeaPad 3 AMD Ryzen 5 16GB',
+  'Laptop Acer Nitro 5 Intel i5 RTX 3050',
   'RTX 4060 8GB GDDR6',
   'RTX 4060 Ti 8GB',
   'RTX 4070 Super 12GB',
@@ -43,6 +46,61 @@ const HARDWARE_TERMS = [
   'Pasta Termica Arctic MX-4 4g'
 ];
 
+function detectCategory(title = '') {
+  const t = title.toLowerCase();
+  if (/laptop|notebook|victus|macbook|thinkpad|pavilion|zenbook|tuf|rog|ideapad|nitro|katana|legion|vivobook/.test(t)) {
+    return 'Laptops';
+  }
+  if (/ssd|nvme|disco|hdd|micro sd|sdce|pendrive|memoria usb|sata|m\.2|xs1000|a400|snv2|snv3/.test(t)) {
+    return 'Almacenamiento';
+  }
+  if (/rtx|gtx|rx \d|geforce|radeon|gpu|tarjeta (de )?video|tarjeta grafica/.test(t)) {
+    return 'Tarjetas de Video';
+  }
+  if (/ryzen|intel core|i3|i5|i7|i9|procesador|cpu|threadripper/.test(t)) {
+    return 'Procesadores';
+  }
+  if (/ram|ddr4|ddr5|ddr3|sodimm|fury beast|vengeance|trident/.test(t)) {
+    return 'Memorias RAM';
+  }
+  if (/placa|motherboard|mainboard|b550|b650|b450|z790|x670|a520|h610/.test(t)) {
+    return 'Placas Madre';
+  }
+  if (/fuente|power supply|80 plus|bronze|gold|650w|750w|850w|500w|600w/.test(t)) {
+    return 'Fuentes de Poder';
+  }
+  if (/monitor|pantalla|144hz|165hz|240hz|ips|oled|display/.test(t)) {
+    return 'Pantallas y Monitores';
+  }
+  if (/teclado|mouse|cooler|audifono|auricular|pasta termica|cable|repuesto|bateria|modulo/.test(t)) {
+    return 'Accesorios y Repuestos';
+  }
+  return 'Hardware General';
+}
+
+function extractSpecs(title = '') {
+  const specs = {};
+  const t = title;
+
+  // CPU
+  const cpuMatch = t.match(/(Ryzen\s+[3579]\s+\w+|Intel\s+Core\s+i[3579]-?\w+|Core\s+i[3579]-?\w+|AMD\s+Ryzen\s+[3579])/i);
+  if (cpuMatch) specs['Procesador'] = cpuMatch[0];
+
+  // RAM
+  const ramMatch = t.match(/(\d+\s*GB)\s*(DDR[345]|RAM)?/i);
+  if (ramMatch) specs['Memoria RAM'] = ramMatch[0];
+
+  // Almacenamiento
+  const diskMatch = t.match(/(\d+\s*(?:TB|GB))\s*(SSD|NVMe|PCIe|M\.2|HDD|SATA)?/i);
+  if (diskMatch) specs['Almacenamiento'] = diskMatch[0];
+
+  // GPU
+  const gpuMatch = t.match(/(RTX\s*\d{4}(?:\s*Ti|\s*Super)?|GTX\s*\d{4}|RX\s*\d{4}(?:\s*XT)?|Radeon\s*\w+|GeForce\s*RTX\s*\d{4})/i);
+  if (gpuMatch) specs['Gráficos'] = gpuMatch[0];
+
+  return specs;
+}
+
 export async function getSuggestions(req, res) {
   const { q } = req.query;
   if (!q || q.trim().length < 2) {
@@ -51,12 +109,10 @@ export async function getSuggestions(req, res) {
 
   const queryClean = q.trim().toLowerCase();
 
-  // Búsqueda prioritaria por prefijo
   const prefixMatches = HARDWARE_TERMS.filter(term =>
     term.toLowerCase().startsWith(queryClean)
   );
 
-  // Búsqueda secundaria por inclusión si no hay suficientes por prefijo
   const containsMatches = HARDWARE_TERMS.filter(
     term => term.toLowerCase().includes(queryClean) && !term.toLowerCase().startsWith(queryClean)
   );
@@ -71,18 +127,30 @@ export async function getSuggestions(req, res) {
 }
 
 export async function executeSearch(req, res) {
-  const { q, store, minPrice, maxPrice, condition, sortBy } = req.query;
+  const { q, store, category, minPrice, maxPrice, condition, sortBy } = req.query;
 
   if (!q || q.trim().length === 0) {
     return res.status(400).json({ error: 'Parámetro de búsqueda "q" requerido' });
   }
 
   try {
-    let products = await fetchScrapedProducts(q.trim());
+    let rawProducts = await fetchScrapedProducts(q.trim());
+
+    // Enriquecer cada producto con categoría detectada y especificaciones extraídas
+    let products = rawProducts.map(p => ({
+      ...p,
+      category: p.category || detectCategory(p.title),
+      specs: extractSpecs(p.title)
+    }));
 
     // Filtrado por tienda
     if (store && store !== 'Todas' && store.trim() !== '') {
       products = products.filter(p => p.store && p.store.toLowerCase() === store.trim().toLowerCase());
+    }
+
+    // Filtrado por categoría
+    if (category && category !== 'Todas' && category.trim() !== '') {
+      products = products.filter(p => p.category && p.category.toLowerCase() === category.trim().toLowerCase());
     }
 
     // Filtrado por condición
@@ -124,7 +192,8 @@ export async function executeSearch(req, res) {
     const validPrices = products.filter(p => p.price > 0).map(p => p.price);
     const lowestPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
     const highestPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
-    const uniqueStores = [...new Set(products.map(p => p.store).filter(Boolean))];
+    const uniqueStores = [...new Set(rawProducts.map(p => p.store).filter(Boolean))];
+    const uniqueCategories = [...new Set(rawProducts.map(p => detectCategory(p.title)).filter(Boolean))];
 
     res.json({
       query: q,
@@ -132,6 +201,7 @@ export async function executeSearch(req, res) {
       lowestPrice,
       highestPrice,
       storesFound: uniqueStores,
+      categoriesFound: uniqueCategories,
       results: products
     });
   } catch (error) {

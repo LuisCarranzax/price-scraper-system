@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
 
-export default function SearchBar({ onSearch, initialValue = '' }) {
+export default function SearchBar({ onSearch, initialValue = '', isCompact = false }) {
   const [input, setInput] = useState(initialValue);
   const [suggestion, setSuggestion] = useState('');
+
+  useEffect(() => {
+    setInput(initialValue);
+  }, [initialValue]);
 
   useEffect(() => {
     if (input.trim().length >= 2) {
@@ -13,7 +18,6 @@ export default function SearchBar({ onSearch, initialValue = '' }) {
         .then(res => res.json())
         .then(data => {
           if (data.suggestion && data.suggestion.toLowerCase().startsWith(input.toLowerCase())) {
-            // Mantiene el casing original escrito por el usuario y concatena el resto
             setSuggestion(input + data.suggestion.slice(input.length));
           } else {
             setSuggestion('');
@@ -51,7 +55,7 @@ export default function SearchBar({ onSearch, initialValue = '' }) {
   };
 
   return (
-    <section className="search-section">
+    <div className={`search-wrapper ${isCompact ? 'compact' : 'hero-mode'}`}>
       <div className="search-box-wrapper">
         <input
           type="text"
@@ -64,31 +68,30 @@ export default function SearchBar({ onSearch, initialValue = '' }) {
         <input
           type="text"
           className="search-input"
-          placeholder="Escribe un componente (Ej: Kingston SSD, RTX 4060, Ryzen 7)..."
+          placeholder="Escribe un componente o repuesto (Ej: SSD Kingston, RTX 4060, Ryzen 7)..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           autoComplete="off"
           spellCheck="false"
+          autoFocus={!isCompact}
         />
         <button 
           className="search-btn" 
           onClick={handleSearchClick}
           type="button"
+          aria-label="Buscar"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          Buscar
+          <Search size={18} />
+          <span>Buscar</span>
         </button>
       </div>
 
-      {suggestion && (
+      {suggestion && !isCompact && (
         <p className="tab-hint">
-          Sugerencia disponible: Presiona <kbd className="kbd-badge">Tab ⇥</kbd> para autocompletar
+          Sugerencia disponible: Presiona <kbd className="kbd-badge">Tab ⇥</kbd> para completar a "{suggestion}"
         </p>
       )}
-    </section>
+    </div>
   );
 }
