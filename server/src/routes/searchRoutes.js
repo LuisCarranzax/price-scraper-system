@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { executeSearch, getSuggestions } from '../controllers/searchController.js';
+import { executeSearch } from '../controllers/searchController.js';
 
 const router = Router();
 
+// Endpoint de búsqueda principal con filtros dinámicos y caché
 router.get('/search', executeSearch);
-router.get('/suggestions', getSuggestions);
 
 export default router;

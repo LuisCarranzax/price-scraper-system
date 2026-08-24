@@ -10,28 +10,32 @@ except ImportError:
 
 
 class MercadoLibreScraper(BaseScraper):
-    def __init__(self):
-        super().__init__()
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "es-419,es;q=0.9,en;q=0.8",
-        }
-
-    def search(self, query: str):
+    def search(self, query: str, limit: int = 25):
         formatted_query = query.strip().lower().replace(" ", "-")
         url = f"https://listado.mercadolibre.com.pe/{formatted_query}"
         
+        self.smart_delay(0.3, 1.2)
+        headers = self.get_random_headers(custom_referer="https://www.mercadolibre.com.pe/")
+        
+        items = []
         try:
-            response = requests.get(url, headers=self.headers, timeout=10)
-            if response.status_code != 200:
+            # Intento con cloudscraper y rotación de headers
+            response = self.scraper.get(url, headers=headers, timeout=12)
+            
+            # Si responde con pantalla de validación o no es 200, intentar con búsqueda directa
+            if response.status_code != 200 or len(response.text) < 15000:
                 alt_url = f"https://listado.mercadolibre.com.pe/{quote(query.strip())}"
-                response = requests.get(alt_url, headers=self.headers, timeout=10)
-                if response.status_code != 200:
-                    return []
+                alt_headers = {
+                    "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                }
+                response = requests.get(alt_url, headers=alt_headers, timeout=10)
+
+            if response.status_code != 200:
+                print(f"[MercadoLibreScraper Warning]: Estado HTTP {response.status_code}")
+                return []
 
             soup = BeautifulSoup(response.text, "html.parser")
-            items = []
 
             card_elements = (
                 soup.select("li.ui-search-layout__item")
@@ -39,7 +43,7 @@ class MercadoLibreScraper(BaseScraper):
                 or soup.select(".ui-search-result__wrapper")
             )
 
-            for container in card_elements[:25]:
+            for container in card_elements[:limit]:
                 title_elem = container.select_one(
                     ".ui-search-item__title, .poly-component__title, h2, h3, a.poly-component__title"
                 )

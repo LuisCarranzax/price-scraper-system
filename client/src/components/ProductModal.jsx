@@ -4,13 +4,12 @@ import {
   ExternalLink, 
   Store, 
   CheckCircle2, 
-  AlertCircle, 
   Cpu, 
   HardDrive, 
   Layers, 
   Monitor, 
   ShieldCheck, 
-  Tag 
+  Tag,Zap
 } from 'lucide-react';
 
 const DEFAULT_PLACEHOLDER_IMG = 'https://placehold.co/400x300/f1f5f9/94a3b8?text=Producto';
@@ -32,10 +31,12 @@ export default function ProductModal({ product, onClose }) {
     const s = store.toLowerCase();
     if (s.includes('mercado libre') || s.includes('mercadolibre')) return 'mercadolibre';
     if (s.includes('mesajil')) return 'mesajil';
-    if (s.includes('falabella')) return 'falabella';
     if (s.includes('alpha')) return 'alphatec';
-    if (s.includes('computer')) return 'computerhouse';
-    if (s.includes('aliexpress')) return 'aliexpress';
+    if (s.includes('computer house') || s.includes('computerhouse')) return 'computerhouse';
+    if (s.includes('cyc')) return 'cyccomputer';
+    if (s.includes('memory') || s.includes('kings')) return 'memorykings';
+    if (s.includes('pegasus')) return 'pegasus5000';
+    if (s.includes('repuesto') || s.includes('laptop peru')) return 'repuestoslaptop';
     return 'default-store';
   };
 
@@ -47,13 +48,14 @@ export default function ProductModal({ product, onClose }) {
   const specsEntries = Object.entries(product.specs || {});
 
   const getSpecIcon = (key) => {
-    switch (key.toLowerCase()) {
-      case 'procesador': return <Cpu size={16} className="spec-icon" />;
-      case 'almacenamiento': return <HardDrive size={16} className="spec-icon" />;
-      case 'memoria ram': return <Layers size={16} className="spec-icon" />;
-      case 'gráficos': return <Monitor size={16} className="spec-icon" />;
-      default: return <Tag size={16} className="spec-icon" />;
-    }
+    const k = key.toLowerCase();
+    if (k.includes('procesador')) return <Cpu size={16} className="spec-icon" />;
+    if (k.includes('ssd') || k.includes('disco duro')) return <HardDrive size={16} className="spec-icon" />;
+    if (k.includes('ram')) return <Layers size={16} className="spec-icon" />;
+    if (k.includes('gráfico') || k.includes('video')) return <Monitor size={16} className="spec-icon" />;
+    if (k.includes('placa') || k.includes('socket'))  return <Cpu size={16} className="spec-icon" />;
+    if (k.includes('plus')) return <Zap size={16} className="spec-icon" />;
+    return <Tag size={16} className="spec-icon" />;
   };
 
   return (
@@ -77,6 +79,7 @@ export default function ProductModal({ product, onClose }) {
               <span>{product.condition || 'Nuevo'}</span>
             </span>
           </div>
+          
 
           <button 
             type="button" 
@@ -109,17 +112,17 @@ export default function ProductModal({ product, onClose }) {
             <div className="modal-price-box">
               <span className="modal-price-label">Precio extraído:</span>
               <div className="modal-price-value">
-                <span className="modal-currency">{product.currency || 'PEN'}</span>
+                <span className="modal-currency">PEN</span>
                 <span className="modal-amount">S/ {formatPrice(product.price)}</span>
               </div>
             </div>
 
-            {/* Ficha de Especificaciones Detectadas */}
+            {/* Ficha de Especificaciones Dinámicas */}
             {specsEntries.length > 0 && (
               <div className="modal-specs-section">
                 <h4 className="specs-title">
                   <Layers size={15} />
-                  <span>Especificaciones Técnicas Clave</span>
+                  <span>Especificaciones Detectadas</span>
                 </h4>
                 <div className="specs-grid">
                   {specsEntries.map(([key, val]) => (
@@ -135,11 +138,11 @@ export default function ProductModal({ product, onClose }) {
               </div>
             )}
 
-            {/* Aviso de Compra Segura */}
+            {/* Aviso de Compra */}
             <div className="modal-notice">
               <ShieldCheck size={18} className="notice-icon" />
               <p>
-                Los precios y el stock están sujetos a verificación en la tienda oficial. Podrán aplicarse descuentos por métodos de pago al concretar la compra.
+                Los precios y el stock corresponden a los datos extraídos en línea. Al acceder a la tienda oficial se confirmarán todas las promociones o cupones disponibles.
               </p>
             </div>
 
@@ -150,7 +153,7 @@ export default function ProductModal({ product, onClose }) {
               rel="noopener noreferrer"
               className="modal-buy-btn"
             >
-              <span>Ver y comprar en {product.store || 'tienda oficial'}</span>
+              <span>Ver y comprar en {product.store || 'tienda'}</span>
               <ExternalLink size={18} />
             </a>
           </div>

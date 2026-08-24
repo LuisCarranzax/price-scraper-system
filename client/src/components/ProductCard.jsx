@@ -10,10 +10,12 @@ export default function ProductCard({ product, onSelect }) {
     const s = store.toLowerCase();
     if (s.includes('mercado libre') || s.includes('mercadolibre')) return 'mercadolibre';
     if (s.includes('mesajil')) return 'mesajil';
-    if (s.includes('falabella')) return 'falabella';
     if (s.includes('alpha')) return 'alphatec';
-    if (s.includes('computer')) return 'computerhouse';
-    if (s.includes('aliexpress')) return 'aliexpress';
+    if (s.includes('computer house') || s.includes('computerhouse')) return 'computerhouse';
+    if (s.includes('cyc')) return 'cyccomputer';
+    if (s.includes('memory') || s.includes('kings')) return 'memorykings';
+    if (s.includes('pegasus')) return 'pegasus5000';
+    if (s.includes('repuesto') || s.includes('laptop peru')) return 'repuestoslaptop';
     return 'default-store';
   };
 
@@ -56,7 +58,7 @@ export default function ProductCard({ product, onSelect }) {
         />
 
         <div className="card-quick-hover">
-          <Eye size={16} />
+          <Eye size={15} />
           <span>Ver detalles completos</span>
         </div>
       </div>

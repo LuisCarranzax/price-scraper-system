@@ -1,9 +1,13 @@
 import sys
 import os
+import time
+import urllib3
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 current_dir = Path(__file__).resolve().parent
 if str(current_dir) not in sys.path:
@@ -12,16 +16,16 @@ if str(current_dir) not in sys.path:
 from scrapers.mercadolibre_scraper import MercadoLibreScraper
 from scrapers.mesajil_scraper import MesajilScraper
 from scrapers.alphatec_scraper import AlphaTecScraper
-from scrapers.pegasus5000_scraper import Pegasus5000Scraper
+from scrapers.computerhouse_scraper import ComputerHouseScraper
 from scrapers.cycComputer_scraper import CycComputerScraper
-from scrapers.repuestoslaptopperu_scraper import RepuestosLaptopScraper
 from scrapers.memoryKings_scraper import MemoryKingsScraper
-
+from scrapers.pegasus5000_scraper import Pegasus5000Scraper
+from scrapers.repuestoslaptopperu_scraper import RepuestosLaptopScraper
 
 app = FastAPI(
     title="Hardware & Electronics Multi-Store Scraper Engine",
-    description="Motor de scraping concurrente para Mercado Libre, Mesajil, Alpha Technology, Pegasus 5000 y CompuVision.",
-    version="1.2.0"
+    description="Motor de scraping optimizado y concurrente para 8 tiendas peruanas.",
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -32,45 +36,77 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicialización de instancias de scrapers
-scrapers = [
-    MercadoLibreScraper(),
-    MesajilScraper(),
-    AlphaTecScraper(),
-    Pegasus5000Scraper(),
-    CycComputerScraper(),
-    RepuestosLaptopScraper(),
-    MemoryKingsScraper()
-]
+SCRAPERS_MAP = {
+    "Mercado Libre": MercadoLibreScraper(),
+    "Mesajil": MesajilScraper(),
+    "Alpha Technology": AlphaTecScraper(),
+    "Computer House": ComputerHouseScraper(),
+    "CYC Computer": CycComputerScraper(),
+    "Memory Kings": MemoryKingsScraper(),
+    "Pegasus 5000": Pegasus5000Scraper(),
+    "Repuestos Laptop Perú": RepuestosLaptopScraper()
+}
 
 @app.get("/")
 def root():
     return {
         "status": "online",
-        "engine": "Multi-Store Hardware Scraper Engine",
-        "stores": ["Mercado Libre", "Mesajil", "Alpha Technology", "Pegasus 5000", "Grupo Compu & Vision",],
-        "endpoints": ["/scrape?q={producto}"]
+        "engine": "Optimized Multi-Store Scraper",
+        "active_stores": list(SCRAPERS_MAP.keys()),
+        "endpoints": ["/scrape?q={producto}&limit={25}&stores={opcional}"]
     }
 
 @app.get("/scrape")
-def scrape_products(q: str = Query(..., min_length=2, description="Término de búsqueda")):
-    results = []
+def scrape_products(
+    q: str = Query(..., min_length=2, description="Término de búsqueda"),
+    limit: int = Query(25, ge=5, le=100, description="Límite dinámico de productos por tienda"),
+    stores: str = Query(None, description="Tiendas separadas por coma")
+):
+    selected_scrapers = {}
+    if stores and isinstance(stores, str):
+        req_stores = [s.strip().lower() for s in stores.split(",") if s.strip()]
+        for name, inst in SCRAPERS_MAP.items():
+            if any(req in name.lower() for req in req_stores):
+                selected_scrapers[name] = inst
+    
+    if not selected_scrapers:
+        selected_scrapers = SCRAPERS_MAP
 
-    # Ejecución concurrente en hilos independientes
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        future_to_scraper = {executor.submit(scraper.search, q): scraper for scraper in scrapers}
-        for future in future_to_scraper:
+    results = []
+    store_logs = {}
+
+    start_all = time.time()
+
+    with ThreadPoolExecutor(max_workers=min(len(selected_scrapers), 8)) as executor:
+        future_to_store = {
+            executor.submit(scraper.search, q, limit): store_name 
+            for store_name, scraper in selected_scrapers.items()
+        }
+
+        for future in future_to_store:
+            store_name = future_to_store[future]
+            start_store = time.time()
             try:
-                scraper_results = future.result()
-                if isinstance(scraper_results, list) and scraper_results:
-                    results.extend(scraper_results)
+                store_results = future.result()
+                duration = round(time.time() - start_store, 2)
+                if isinstance(store_results, list) and store_results:
+                    results.extend(store_results)
+                    store_logs[store_name] = {"status": "ok", "count": len(store_results), "time_sec": duration}
+                else:
+                    store_logs[store_name] = {"status": "empty", "count": 0, "time_sec": duration}
             except Exception as e:
-                scraper_name = type(future_to_scraper[future]).__name__
-                print(f"[Error in {scraper_name}]: {e}")
+                duration = round(time.time() - start_store, 2)
+                store_logs[store_name] = {"status": "error", "error": str(e), "time_sec": duration}
+                print(f"[Store Error {store_name}]: {e}")
+
+    total_time = round(time.time() - start_all, 2)
 
     return {
         "query": q,
         "count": len(results),
+        "limit_per_store": limit,
+        "total_time_sec": total_time,
+        "store_logs": store_logs,
         "products": results
     }
 

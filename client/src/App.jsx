@@ -1,19 +1,20 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Zap, 
   ArrowLeft, 
-  SlidersHorizontal, 
   RotateCcw, 
   Info, 
   AlertTriangle, 
   Search, 
-  ShoppingBag, 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
   Sparkles,
   Layers,
   Store,
-  CheckCircle2
+  CheckCircle2,
+  Filter,
+  DollarSign
 } from 'lucide-react';
 import SearchBar from './components/SearchBar';
 import ProductCard from './components/ProductCard';
@@ -31,33 +32,32 @@ const QUICK_SUGGESTIONS = [
   'Pantalla iPhone 11 Repuesto'
 ];
 
-const CATEGORIES = [
-  { value: '', label: 'Todas las categorías' },
-  { value: 'Laptops', label: 'Laptops y Portátiles' },
-  { value: 'Almacenamiento', label: 'Almacenamiento (SSD / Discos)' },
-  { value: 'Tarjetas de Video', label: 'Tarjetas de Video (GPUs)' },
-  { value: 'Procesadores', label: 'Procesadores (CPUs)' },
-  { value: 'Memorias RAM', label: 'Memorias RAM' },
-  { value: 'Placas Madre', label: 'Placas Madre' },
-  { value: 'Fuentes de Poder', label: 'Fuentes de Poder' },
-  { value: 'Pantallas y Monitores', label: 'Pantallas y Monitores' },
-  { value: 'Accesorios y Repuestos', label: 'Accesorios y Repuestos' }
+const AVAILABLE_STORES = [
+  'Mercado Libre',
+  'Mesajil',
+  'Alpha Technology',
+  'Computer House',
+  'CYC Computer',
+  'Memory Kings',
+  'Pegasus 5000',
+  'Repuestos Laptop Perú'
 ];
 
-const STORES = [
-  { value: '', label: 'Todas las tiendas' },
-  { value: 'Mercado Libre', label: 'Mercado Libre' },
-  { value: 'Mesajil', label: 'Mesajil' },
-  { value: 'Alpha Technology', label: 'Alpha Technology' },
-  { value: 'Pegasus 5000', label: 'Pegasus 5000' },
-  { value: 'Grupo Compu & Vision', label: 'Grupo Compu & Vision' },
-  { value: 'Impacto', label: 'Impacto' },
-  { value: 'Sercoplus', label: 'Sercoplus' },
-  { value: 'CYC Computer', label: 'CYC Computer' },
-  { value: 'Cahuana', label: 'Cahuana' },
-  { value: 'Memory Kings', label: 'Memory Kings' }
+const AVAILABLE_CATEGORIES = [
+  'Laptops',
+  'Almacenamiento',
+  'Tarjetas de Video',
+  'Procesadores',
+  'Memorias RAM',
+  'Placas Madre',
+  'Fuentes de Poder',
+  'Pantallas y Monitores',
+  'Accesorios y Repuestos'
+];
 
-
+const AVAILABLE_CONDITIONS = [
+  'Nuevo',
+  'Seminuevo / Usado'
 ];
 
 export default function App() {
@@ -76,39 +76,96 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
+  // Control de menú dropdown abierto (solo 1 abierto a la vez)
+  const [openDropdown, setOpenDropdown] = useState(null);
+
+  // Estados de Filtros (Borrador antes de Aplicar)
+  const [selectedStores, setSelectedStores] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedConditions, setSelectedConditions] = useState([]);
+  const [maxPrice, setMaxPrice] = useState('');
+  const [sortBy, setSortBy] = useState('default');
+
+  const filterBarRef = useRef(null);
   const resultsTopRef = useRef(null);
 
-  const [filters, setFilters] = useState({
-    store: '',
-    category: '',
-    condition: '',
-    maxPrice: '',
-    sortBy: 'default'
-  });
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (filterBarRef.current && !filterBarRef.current.contains(event.target)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const executeSearchRequest = (query, currentFilters = filters) => {
+  const toggleDropdown = (name) => {
+    setOpenDropdown(prev => prev === name ? null : name);
+  };
+
+  const handleStoreToggle = (storeName) => {
+    setSelectedStores(prev => 
+      prev.includes(storeName) 
+        ? prev.filter(s => s !== storeName) 
+        : [...prev, storeName]
+    );
+  };
+
+  const handleCategoryToggle = (catName) => {
+    setSelectedCategories(prev => 
+      prev.includes(catName) 
+        ? prev.filter(c => c !== catName) 
+        : [...prev, catName]
+    );
+  };
+
+  const handleConditionToggle = (condName) => {
+    setSelectedConditions(prev => 
+      prev.includes(condName) 
+        ? prev.filter(c => c !== condName) 
+        : [...prev, condName]
+    );
+  };
+
+  const executeSearchRequest = (query, filtersToUse = {
+    stores: selectedStores,
+    categories: selectedCategories,
+    conditions: selectedConditions,
+    maxPrice: maxPrice,
+    sortBy: sortBy
+  }) => {
     if (!query || !query.trim()) return;
     setLoading(true);
     setError(null);
     setSearched(true);
     setCurrentQuery(query.trim());
     setCurrentPage(1);
+    setOpenDropdown(null);
 
     const params = new URLSearchParams({
       q: query.trim()
     });
 
-    if (currentFilters.store) params.append('store', currentFilters.store);
-    if (currentFilters.category) params.append('category', currentFilters.category);
-    if (currentFilters.condition) params.append('condition', currentFilters.condition);
-    if (currentFilters.maxPrice) params.append('maxPrice', currentFilters.maxPrice);
-    if (currentFilters.sortBy && currentFilters.sortBy !== 'default') {
-      params.append('sortBy', currentFilters.sortBy);
+    if (filtersToUse.stores && filtersToUse.stores.length > 0) {
+      params.append('stores', filtersToUse.stores.join(','));
+    }
+    if (filtersToUse.categories && filtersToUse.categories.length > 0) {
+      params.append('categories', filtersToUse.categories.join(','));
+    }
+    if (filtersToUse.conditions && filtersToUse.conditions.length > 0) {
+      params.append('conditions', filtersToUse.conditions.join(','));
+    }
+    if (filtersToUse.maxPrice) {
+      params.append('maxPrice', filtersToUse.maxPrice);
+    }
+    if (filtersToUse.sortBy && filtersToUse.sortBy !== 'default') {
+      params.append('sortBy', filtersToUse.sortBy);
     }
 
     fetch(`http://localhost:5000/api/search?${params.toString()}`)
       .then((res) => {
-        if (!res.ok) throw new Error('Error al conectar con el servidor Gateway');
+        if (!res.ok) throw new Error('Error al conectar con el servidor');
         return res.json();
       })
       .then((data) => {
@@ -124,35 +181,38 @@ export default function App() {
       })
       .catch((err) => {
         console.error('Search error:', err);
-        setError('No se pudo conectar con el servidor de scraping. Verifica que el backend esté en ejecución.');
+        setError('No se pudo conectar con el motor de scraping. Verifica que el backend esté ejecutándose.');
         setProducts([]);
         setLoading(false);
       });
   };
 
   const handleSearch = (query) => {
-    executeSearchRequest(query, filters);
+    executeSearchRequest(query);
   };
 
-  const handleFilterChange = (key, value) => {
-    const updated = { ...filters, [key]: value };
-    setFilters(updated);
+  const handleApplyFilters = () => {
+    setOpenDropdown(null);
     if (currentQuery) {
-      executeSearchRequest(currentQuery, updated);
+      executeSearchRequest(currentQuery);
     }
   };
 
   const handleResetFilters = () => {
-    const reset = {
-      store: '',
-      category: '',
-      condition: '',
-      maxPrice: '',
-      sortBy: 'default'
-    };
-    setFilters(reset);
+    setSelectedStores([]);
+    setSelectedCategories([]);
+    setSelectedConditions([]);
+    setMaxPrice('');
+    setSortBy('default');
+    setOpenDropdown(null);
     if (currentQuery) {
-      executeSearchRequest(currentQuery, reset);
+      executeSearchRequest(currentQuery, {
+        stores: [],
+        categories: [],
+        conditions: [],
+        maxPrice: '',
+        sortBy: 'default'
+      });
     }
   };
 
@@ -163,13 +223,12 @@ export default function App() {
     setError(null);
     setCurrentPage(1);
     setSelectedProduct(null);
-    setFilters({
-      store: '',
-      category: '',
-      condition: '',
-      maxPrice: '',
-      sortBy: 'default'
-    });
+    setOpenDropdown(null);
+    setSelectedStores([]);
+    setSelectedCategories([]);
+    setSelectedConditions([]);
+    setMaxPrice('');
+    setSortBy('default');
   };
 
   const handlePageChange = (newPage) => {
@@ -185,11 +244,9 @@ export default function App() {
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, products.length);
   const paginatedProducts = products.slice(startIndex, endIndex);
 
-  // Rango máximo del slider basado en el catálogo encontrado
   const sliderMaxBound = Math.max(meta.highestPrice || 10000, 1000);
-  const currentSliderValue = filters.maxPrice !== '' ? Number(filters.maxPrice) : sliderMaxBound;
+  const currentSliderValue = maxPrice !== '' ? Number(maxPrice) : sliderMaxBound;
 
-  // Componente reutilizable de paginación
   const renderPagination = (isTop = false) => {
     if (totalPages <= 1) return null;
 
@@ -314,197 +371,278 @@ export default function App() {
             <div className="disclaimer-banner">
               <Info size={20} className="disclaimer-icon" />
               <div className="disclaimer-text">
-                <strong>Aviso sobre Precios y Ofertas:</strong> Los precios mostrados son extraídos por scraping de fuentes públicas. Pueden existir promociones temporales, cupones o descuentos por método de pago aplicables directamente al visitar la tienda oficial.
+                <strong>Aviso sobre Precios:</strong> Los precios mostrados son extraídos por scraping de fuentes públicas. Promociones o cupones de cada tienda se confirmarán al pulsar <em>"Ver en tienda"</em>.
               </div>
             </div>
 
-            {/* Layout Principal: Sidebar + Grid */}
-            <div className="main-layout">
-              {/* Barra Lateral de Filtros */}
-              <aside className="filter-sidebar">
-                <div className="filter-header">
-                  <h3 className="filter-title">
-                    <SlidersHorizontal size={16} />
-                    <span>Filtros Inteligentes</span>
-                  </h3>
-                  <button 
-                    type="button" 
-                    className="reset-btn" 
+            {/* BARRA DE FILTROS REDISEÑADA: DROPDOWNS CON CHECKBOXES Y BOTÓN APLICAR */}
+            <div className="filter-dropdowns-bar" ref={filterBarRef}>
+              <div className="filter-dropdowns-group">
+                {/* 1. Dropdown Tiendas */}
+                <div className="dropdown-wrapper">
+                  <button
+                    type="button"
+                    className={`dropdown-trigger-btn ${selectedStores.length > 0 ? 'active' : ''}`}
+                    onClick={() => toggleDropdown('stores')}
+                  >
+                    <Store size={14} />
+                    <span>
+                      Tiendas {selectedStores.length > 0 ? `(${selectedStores.length})` : ''}
+                    </span>
+                    <ChevronDown size={14} className={`dropdown-chevron ${openDropdown === 'stores' ? 'open' : ''}`} />
+                  </button>
+
+                  {openDropdown === 'stores' && (
+                    <div className="dropdown-menu-card">
+                      <div className="dropdown-menu-header">
+                        <span>Seleccionar Tiendas</span>
+                      </div>
+                      <div className="dropdown-options-list">
+                        {AVAILABLE_STORES.map(storeName => (
+                          <label key={storeName} className="checkbox-option-row">
+                            <input
+                              type="checkbox"
+                              checked={selectedStores.includes(storeName)}
+                              onChange={() => handleStoreToggle(storeName)}
+                            />
+                            <span>{storeName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Dropdown Categorías */}
+                <div className="dropdown-wrapper">
+                  <button
+                    type="button"
+                    className={`dropdown-trigger-btn ${selectedCategories.length > 0 ? 'active' : ''}`}
+                    onClick={() => toggleDropdown('categories')}
+                  >
+                    <Layers size={14} />
+                    <span>
+                      Categorías {selectedCategories.length > 0 ? `(${selectedCategories.length})` : ''}
+                    </span>
+                    <ChevronDown size={14} className={`dropdown-chevron ${openDropdown === 'categories' ? 'open' : ''}`} />
+                  </button>
+
+                  {openDropdown === 'categories' && (
+                    <div className="dropdown-menu-card">
+                      <div className="dropdown-menu-header">
+                        <span>Filtrar por Categoría</span>
+                      </div>
+                      <div className="dropdown-options-list">
+                        {AVAILABLE_CATEGORIES.map(catName => (
+                          <label key={catName} className="checkbox-option-row">
+                            <input
+                              type="checkbox"
+                              checked={selectedCategories.includes(catName)}
+                              onChange={() => handleCategoryToggle(catName)}
+                            />
+                            <span>{catName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Dropdown Estado */}
+                <div className="dropdown-wrapper">
+                  <button
+                    type="button"
+                    className={`dropdown-trigger-btn ${selectedConditions.length > 0 ? 'active' : ''}`}
+                    onClick={() => toggleDropdown('conditions')}
+                  >
+                    <CheckCircle2 size={14} />
+                    <span>
+                      Estado {selectedConditions.length > 0 ? `(${selectedConditions.length})` : ''}
+                    </span>
+                    <ChevronDown size={14} className={`dropdown-chevron ${openDropdown === 'conditions' ? 'open' : ''}`} />
+                  </button>
+
+                  {openDropdown === 'conditions' && (
+                    <div className="dropdown-menu-card">
+                      <div className="dropdown-menu-header">
+                        <span>Estado del Producto</span>
+                      </div>
+                      <div className="dropdown-options-list">
+                        {AVAILABLE_CONDITIONS.map(condName => (
+                          <label key={condName} className="checkbox-option-row">
+                            <input
+                              type="checkbox"
+                              checked={selectedConditions.includes(condName)}
+                              onChange={() => handleConditionToggle(condName)}
+                            />
+                            <span>{condName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Dropdown Rango de Precio con Slider */}
+                <div className="dropdown-wrapper">
+                  <button
+                    type="button"
+                    className={`dropdown-trigger-btn ${maxPrice !== '' ? 'active' : ''}`}
+                    onClick={() => toggleDropdown('price')}
+                  >
+                    <DollarSign size={14} />
+                    <span>
+                      {maxPrice !== '' ? `Hasta S/ ${Number(maxPrice).toLocaleString('es-PE')}` : 'Precio Máximo'}
+                    </span>
+                    <ChevronDown size={14} className={`dropdown-chevron ${openDropdown === 'price' ? 'open' : ''}`} />
+                  </button>
+
+                  {openDropdown === 'price' && (
+                    <div className="dropdown-menu-card slider-dropdown-card">
+                      <div className="dropdown-menu-header">
+                        <span>Rango de Precio</span>
+                        <span className="slider-badge-val">Hasta S/ {currentSliderValue.toLocaleString('es-PE')}</span>
+                      </div>
+                      <div className="slider-control-box">
+                        <input
+                          type="range"
+                          min="0"
+                          max={sliderMaxBound}
+                          step="50"
+                          value={currentSliderValue}
+                          onChange={(e) => setMaxPrice(e.target.value)}
+                          className="custom-range-slider"
+                        />
+                        <div className="slider-limits">
+                          <span>S/ 0</span>
+                          <span>S/ {sliderMaxBound.toLocaleString('es-PE')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botón Aplicar Filtros */}
+                <button
+                  type="button"
+                  className="apply-filters-btn"
+                  onClick={handleApplyFilters}
+                  title="Aplicar filtros seleccionados"
+                >
+                  <Filter size={14} />
+                  <span>Aplicar filtros</span>
+                </button>
+
+                {/* Botón Limpiar */}
+                {(selectedStores.length > 0 || selectedCategories.length > 0 || selectedConditions.length > 0 || maxPrice !== '') && (
+                  <button
+                    type="button"
+                    className="reset-filters-btn"
                     onClick={handleResetFilters}
-                    title="Restablecer todos los filtros"
+                    title="Limpiar todos los filtros"
                   >
                     <RotateCcw size={13} />
                     <span>Limpiar</span>
                   </button>
-                </div>
-
-                {/* Filtro: Tipo / Categoría de Producto */}
-                <div className="filter-group">
-                  <label htmlFor="category-filter">
-                    <Layers size={13} />
-                    <span>Categoría</span>
-                  </label>
-                  <select
-                    id="category-filter"
-                    className="filter-select"
-                    value={filters.category}
-                    onChange={(e) => handleFilterChange('category', e.target.value)}
-                  >
-                    {CATEGORIES.map(c => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Filtro: Tienda de Origen */}
-                <div className="filter-group">
-                  <label htmlFor="store-filter">
-                    <Store size={13} />
-                    <span>Tienda</span>
-                  </label>
-                  <select
-                    id="store-filter"
-                    className="filter-select"
-                    value={filters.store}
-                    onChange={(e) => handleFilterChange('store', e.target.value)}
-                  >
-                    {STORES.map(s => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Filtro: Deslizador de Rango de Precios (Range Slider) */}
-                <div className="filter-group slider-group">
-                  <div className="slider-label-row">
-                    <label htmlFor="price-slider">
-                      <span>Precio Máximo</span>
-                    </label>
-                    <span className="slider-value-badge">
-                      Hasta S/ {currentSliderValue.toLocaleString('es-PE')}
-                    </span>
-                  </div>
-
-                  <input
-                    id="price-slider"
-                    type="range"
-                    min="0"
-                    max={sliderMaxBound}
-                    step="50"
-                    value={currentSliderValue}
-                    onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-                    className="custom-range-slider"
-                  />
-
-                  <div className="slider-limits">
-                    <span>S/ 0</span>
-                    <span>S/ {sliderMaxBound.toLocaleString('es-PE')}</span>
-                  </div>
-                </div>
-
-                {/* Filtro: Estado del Producto */}
-                <div className="filter-group">
-                  <label htmlFor="condition-filter">
-                    <CheckCircle2 size={13} />
-                    <span>Estado</span>
-                  </label>
-                  <select
-                    id="condition-filter"
-                    className="filter-select"
-                    value={filters.condition}
-                    onChange={(e) => handleFilterChange('condition', e.target.value)}
-                  >
-                    <option value="">Cualquier estado</option>
-                    <option value="Nuevo">Nuevo</option>
-                    <option value="Seminuevo / Usado">Seminuevo / Repuestos</option>
-                  </select>
-                </div>
-              </aside>
-
-              {/* Contenedor de Resultados */}
-              <main className="results-container">
-                {/* Toolbar de Información, Orden y Paginación Superior */}
-                {!loading && !error && (
-                  <div className="results-toolbar">
-                    <div className="results-info">
-                      <span className="results-count">
-                        {products.length} {products.length === 1 ? 'producto encontrado' : 'productos encontrados'} para "{currentQuery}"
-                      </span>
-                      {meta.lowestPrice > 0 && (
-                        <span className="price-highlight-badge">
-                          Desde S/ {meta.lowestPrice.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="sort-wrapper">
-                      <label htmlFor="sort-select" className="sort-label">Ordenar:</label>
-                      <select
-                        id="sort-select"
-                        className="sort-select"
-                        value={filters.sortBy}
-                        onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                      >
-                        <option value="default">Relevancia</option>
-                        <option value="price_asc">Menor precio</option>
-                        <option value="price_desc">Mayor precio</option>
-                        <option value="name_asc">Nombre (A-Z)</option>
-                      </select>
-                    </div>
-                  </div>
                 )}
+              </div>
 
-                {/* Paginación Superior */}
-                {!loading && !error && renderPagination(true)}
-
-                {/* Estado: Cargando */}
-                {loading && (
-                  <div className="state-container">
-                    <div className="spinner"></div>
-                    <h3 className="state-title">Comparando precios en múltiples tiendas...</h3>
-                    <p className="state-desc">
-                      Consultando Mercado Libre, Mesajil, Alpha Technology, Computer House, Falabella y AliExpress para "{currentQuery}".
-                    </p>
-                  </div>
-                )}
-
-                {/* Estado: Error */}
-                {!loading && error && (
-                  <div className="state-container">
-                    <AlertTriangle size={42} className="state-icon-alert" />
-                    <h3 className="state-title">Hubo un problema</h3>
-                    <p className="state-desc">{error}</p>
-                  </div>
-                )}
-
-                {/* Estado: Sin Resultados */}
-                {!loading && !error && products.length === 0 && (
-                  <div className="state-container">
-                    <Search size={42} className="state-icon-search" />
-                    <h3 className="state-title">No se encontraron productos</h3>
-                    <p className="state-desc">
-                      No encontramos coincidencias para "{currentQuery}" con los filtros actuales. Prueba ampliando el rango del deslizador de precio o seleccionando "Todas las tiendas".
-                    </p>
-                  </div>
-                )}
-
-                {/* Cuadrícula de Productos (3 columnas x 5 filas = 15 por página) */}
-                {!loading && !error && paginatedProducts.length > 0 && (
-                  <div className="product-grid-3col">
-                    {paginatedProducts.map((p) => (
-                      <ProductCard 
-                        key={p.id} 
-                        product={p} 
-                        onSelect={(prod) => setSelectedProduct(prod)} 
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Paginación Inferior */}
-                {!loading && !error && renderPagination(false)}
-              </main>
+              {/* Selector de Orden */}
+              <div className="sort-inline-box">
+                <label htmlFor="sort-select" className="sort-label">Ordenar:</label>
+                <select
+                  id="sort-select"
+                  className="sort-select"
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value);
+                    if (currentQuery) {
+                      executeSearchRequest(currentQuery, {
+                        stores: selectedStores,
+                        categories: selectedCategories,
+                        conditions: selectedConditions,
+                        maxPrice: maxPrice,
+                        sortBy: e.target.value
+                      });
+                    }
+                  }}
+                >
+                  <option value="default">Relevancia</option>
+                  <option value="price_asc">Menor precio</option>
+                  <option value="price_desc">Mayor precio</option>
+                  <option value="name_asc">Nombre (A-Z)</option>
+                </select>
+              </div>
             </div>
+
+            {/* Contenedor de Resultados */}
+            <main className="results-container">
+              {/* Toolbar de Información */}
+              {!loading && !error && (
+                <div className="results-toolbar">
+                  <div className="results-info">
+                    <span className="results-count">
+                      {products.length} {products.length === 1 ? 'producto encontrado' : 'productos encontrados'} para "{currentQuery}"
+                    </span>
+                    {meta.lowestPrice > 0 && (
+                      <span className="price-highlight-badge">
+                        Desde S/ {meta.lowestPrice.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Paginación Superior */}
+              {!loading && !error && renderPagination(true)}
+
+              {/* Estado: Cargando */}
+              {loading && (
+                <div className="state-container">
+                  <div className="spinner"></div>
+                  <h3 className="state-title">Extrayendo y comparando precios en tiempo real...</h3>
+                  <p className="state-desc">
+                    Consultando Mercado Libre, Mesajil, Alpha Technology y Computer House para "{currentQuery}".
+                  </p>
+                </div>
+              )}
+
+              {/* Estado: Error */}
+              {!loading && error && (
+                <div className="state-container">
+                  <AlertTriangle size={42} className="state-icon-alert" />
+                  <h3 className="state-title">Hubo un problema</h3>
+                  <p className="state-desc">{error}</p>
+                </div>
+              )}
+
+              {/* Estado: Sin Resultados */}
+              {!loading && !error && products.length === 0 && (
+                <div className="state-container">
+                  <Search size={42} className="state-icon-search" />
+                  <h3 className="state-title">No se encontraron productos</h3>
+                  <p className="state-desc">
+                    No encontramos coincidencias para "{currentQuery}" con los filtros seleccionados. Intenta ampliar el rango de precio o seleccionar más tiendas.
+                  </p>
+                </div>
+              )}
+
+              {/* Cuadrícula de Productos (3 columnas x 5 filas = 15 por página) */}
+              {!loading && !error && paginatedProducts.length > 0 && (
+                <div className="product-grid-3col">
+                  {paginatedProducts.map((p) => (
+                    <ProductCard 
+                      key={p.id} 
+                      product={p} 
+                      onSelect={(prod) => setSelectedProduct(prod)} 
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Paginación Inferior */}
+              {!loading && !error && renderPagination(false)}
+            </main>
           </div>
 
           {/* Modal de Detalle de Producto */}

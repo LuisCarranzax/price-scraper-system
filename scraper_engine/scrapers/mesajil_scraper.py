@@ -1,5 +1,5 @@
-import requests
 from bs4 import BeautifulSoup
+from urllib.parse import quote
 
 try:
     from .base_scraper import BaseScraper
@@ -8,26 +8,22 @@ except ImportError:
 
 
 class MesajilScraper(BaseScraper):
-    def __init__(self):
-        super().__init__()
-        self.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Referer": "https://mesajil.com/",
-        })
-
-    def search(self, query: str):
-        url = f"https://mesajil.com/?s={query.strip().replace(' ', '+')}&post_type=product"
+    def search(self, query: str, limit: int = 25):
+        url = f"https://mesajil.com/?s={quote(query.strip())}&post_type=product"
         items = []
 
+        self.smart_delay(0.2, 0.8)
+        headers = self.get_random_headers(custom_referer="https://mesajil.com/")
+
         try:
-            response = requests.get(url, headers=self.headers, timeout=10)
+            response = self.scraper.get(url, headers=headers, timeout=12)
             if response.status_code != 200:
                 return []
 
             soup = BeautifulSoup(response.text, "html.parser")
             cards = soup.select(".wd-product, .product-grid-item, li.product")
 
-            for p in cards[:20]:
+            for p in cards[:limit]:
                 title_elem = p.select_one("h2.limited-lines, .mpd-product-title h2, .woocommerce-loop-product__title, .product-title")
                 price_elem = p.select_one(".price ins .woocommerce-Price-amount, .price .woocommerce-Price-amount, .woocommerce-Price-amount")
                 img_elem = p.select_one("img")
