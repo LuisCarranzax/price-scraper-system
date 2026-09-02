@@ -9,7 +9,9 @@ import {
   Layers, 
   Monitor, 
   ShieldCheck, 
-  Tag,Zap
+  Tag,
+  Zap,
+  Activity
 } from 'lucide-react';
 
 const DEFAULT_PLACEHOLDER_IMG = 'https://placehold.co/400x300/f1f5f9/94a3b8?text=Producto';
@@ -47,48 +49,52 @@ export default function ProductModal({ product, onClose }) {
 
   const specsEntries = Object.entries(product.specs || {});
 
-  const getSpecIcon = (key) => {
+  const getSpecIcon = (key = '') => {
     const k = key.toLowerCase();
-    if (k.includes('procesador')) return <Cpu size={16} className="spec-icon" />;
-    if (k.includes('ssd') || k.includes('disco duro')) return <HardDrive size={16} className="spec-icon" />;
-    if (k.includes('ram')) return <Layers size={16} className="spec-icon" />;
-    if (k.includes('gráfico') || k.includes('video')) return <Monitor size={16} className="spec-icon" />;
-    if (k.includes('placa') || k.includes('socket'))  return <Cpu size={16} className="spec-icon" />;
-    if (k.includes('plus')) return <Zap size={16} className="spec-icon" />;
+    if (k.includes('procesador') || k.includes('socket') || k.includes('chipset')) return <Cpu size={16} className="spec-icon" />;
+    if (k.includes('potencia') || k.includes('watts')) return <Zap size={16} className="spec-icon" />;
+    if (k.includes('certificación') || k.includes('certificacion')) return <ShieldCheck size={16} className="spec-icon" />;
+    if (k.includes('almacenamiento') || k.includes('disco') || k.includes('capacidad')) return <HardDrive size={16} className="spec-icon" />;
+    if (k.includes('ram') || k.includes('vram') || k.includes('formato') || k.includes('tipo')) return <Layers size={16} className="spec-icon" />;
+    if (k.includes('gráfico') || k.includes('video') || k.includes('gpu') || k.includes('monitor') || k.includes('sistema operativo')) return <Monitor size={16} className="spec-icon" />;
+    if (k.includes('frecuencia') || k.includes('interfaz')) return <Activity size={16} className="spec-icon" />;
     return <Tag size={16} className="spec-icon" />;
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        {/* Cabecera del Modal */}
+        {/* Cabecera del Modal con Insignias Integradas */}
         <div className="modal-header">
-          <div className="modal-badges-group">
-            <span className={`store-badge ${getStoreClass(product.store)}`}>
-              <Store size={12} />
+          {/* Esquina Superior Izquierda: Tienda + Categoría */}
+          <div className="modal-header-left">
+            <span className={`modal-badge modal-store-badge ${getStoreClass(product.store)}`}>
+              <Store size={13} />
               <span>{product.store || 'Tienda'}</span>
             </span>
 
-            <span className="category-badge">
-              <Tag size={12} />
+            <span className="modal-badge modal-category-badge">
+              <Tag size={13} />
               <span>{product.category || 'Hardware'}</span>
             </span>
+          </div>
 
-            <span className={`condition-badge ${product.condition?.toLowerCase().includes('usado') ? 'usado' : 'nuevo'}`}>
-              <CheckCircle2 size={12} />
+          {/* Esquina Superior Derecha: Estado + Botón Cerrar */}
+          <div className="modal-header-right">
+            <span className={`modal-badge modal-condition-badge ${product.condition?.toLowerCase().includes('usado') ? 'usado' : 'nuevo'}`}>
+              <CheckCircle2 size={13} />
               <span>{product.condition || 'Nuevo'}</span>
             </span>
-          </div>
-          
 
-          <button 
-            type="button" 
-            className="modal-close-btn" 
-            onClick={onClose}
-            aria-label="Cerrar modal"
-          >
-            <X size={20} />
-          </button>
+            <button 
+              type="button" 
+              className="modal-close-btn" 
+              onClick={onClose}
+              aria-label="Cerrar modal"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Cuerpo del Modal */}
