@@ -13,6 +13,7 @@ contexto.md
 dist
 dist-ssr
 *.local
+contexto.md
 
 # Editor directories and files
 .vscode/*

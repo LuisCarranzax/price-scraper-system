@@ -1,4 +1,4 @@
-const PYTHON_SCRAPER_URL = 'http://127.0.0.1:8000';
+const PYTHON_SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://127.0.0.1:8000';
 
 // Caché en memoria con TTL de 5 minutos (300,000 ms)
 const CACHE_TTL_MS = 5 * 60 * 1000;

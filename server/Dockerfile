@@ -1,0 +1,14 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install --production
+
+COPY . .
+
+EXPOSE 5000
+
+ENV PYTHON_SCRAPER_URL=http://scraper-engine:8000
+
+CMD ["node", "src/server.js"]

@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  scraper-engine:
+    build:
+      context: ./scraper_engine
+      dockerfile: Dockerfile
+    container_name: price-scraper-engine
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - scraper-net
+
+  server-gateway:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: price-scraper-gateway
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHON_SCRAPER_URL=http://scraper-engine:8000
+    depends_on:
+      - scraper-engine
+    restart: unless-stopped
+    networks:
+      - scraper-net
+
+  client-frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: price-scraper-client
+    ports:
+      - "5173:80"
+    depends_on:
+      - server-gateway
+    restart: unless-stopped
+    networks:
+      - scraper-net
+
+networks:
+  scraper-net:
+    driver: bridge
